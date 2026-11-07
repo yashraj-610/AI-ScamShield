@@ -44,7 +44,7 @@ private val QrMuted = Color(0xFF71819A)
 private val QrSoftBlue = Color(0xFFE4EEFF)
 
 private const val QR_ENDPOINT =
-    "http://127.0.0.1:8765/check-qr"
+    "https://ai-scamshield-p6el.onrender.com/check-qr"
 
 private const val MAX_QR_IMAGE_BYTES = 5 * 1024 * 1024
 

@@ -33,7 +33,7 @@ private val NumberMuted = Color(0xFF71819A)
 private val NumberSoftBlue = Color(0xFFE4EEFF)
 
 private const val CALL_TEXT_API =
-    "http://127.0.0.1:8765/check-message"
+    "https://ai-scamshield-p6el.onrender.com/check-message"
 
 private data class CallerTextResult(
     val category: String,

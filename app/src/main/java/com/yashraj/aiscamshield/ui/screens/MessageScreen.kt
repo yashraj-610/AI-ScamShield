@@ -1,5 +1,4 @@
 ﻿
-
 package com.yashraj.aiscamshield.ui.screens
 
 import androidx.compose.foundation.Canvas
@@ -9,19 +8,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,6 +21,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Locale
 
 private val MessageBg = Color(0xFFF5F8FF)
 private val MessageNavy = Color(0xFF183B65)
@@ -40,11 +36,31 @@ private val MessageBlue = Color(0xFF477DE0)
 private val MessageMuted = Color(0xFF71819A)
 private val MessageSoftBlue = Color(0xFFE4EEFF)
 
+private const val MESSAGE_API_URL =
+    "http://127.0.0.1:8000/check-message"
+
+private data class MessagePrediction(
+    val category: String,
+    val confidence: Double,
+    val scores: Map<String, Double>,
+    val note: String
+)
+
 @Composable
 fun MessageScreen(onBack: () -> Unit) {
 
     var message by remember { mutableStateOf("") }
-    var showNotice by remember { mutableStateOf(false) }
+    var prediction by remember {
+        mutableStateOf<MessagePrediction?>(null)
+    }
+    var errorMessage by remember {
+        mutableStateOf<String?>(null)
+    }
+    var isLoading by remember {
+        mutableStateOf(false)
+    }
+
+    val scope = rememberCoroutineScope()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -186,7 +202,8 @@ fun MessageScreen(onBack: () -> Unit) {
                     value = message,
                     onValueChange = {
                         message = it
-                        showNotice = false
+                        prediction = null
+                        errorMessage = null
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -215,8 +232,35 @@ fun MessageScreen(onBack: () -> Unit) {
             // Analyse button
             Button(
                 onClick = {
-                    showNotice = true
+                    val textToCheck = message.trim()
+
+                    if (textToCheck.isBlank()) {
+                        prediction = null
+                        errorMessage =
+                            "Please enter a message before continuing."
+                    } else {
+                        scope.launch {
+                            isLoading = true
+                            prediction = null
+                            errorMessage = null
+
+                            try {
+                                prediction =
+                                    checkMessageWithApi(textToCheck)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                errorMessage =
+                                    "Could not connect to Message Detection. " +
+                                            "Check that the Python server is running " +
+                                            "and ADB port forwarding is enabled."
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    }
                 },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -226,15 +270,29 @@ fun MessageScreen(onBack: () -> Unit) {
                     contentColor = Color.White
                 )
             ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
+
                 Text(
-                    text = "Analyse Message",
+                    text = if (isLoading) {
+                        "Analysing..."
+                    } else {
+                        "Analyse Message"
+                    },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // Prototype status
-            if (showNotice) {
+            // Results
+            if (prediction != null || errorMessage != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
@@ -245,29 +303,102 @@ fun MessageScreen(onBack: () -> Unit) {
                     Column(
                         modifier = Modifier.padding(18.dp)
                     ) {
-                        Text(
-                            text = if (message.isBlank()) {
-                                "Message required"
-                            } else {
-                                "Detection not connected"
-                            },
-                            color = MessageNavy,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (errorMessage != null) {
+                            Text(
+                                text = "Unable to analyse message",
+                                color = MessageNavy,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                        Spacer(modifier = Modifier.height(7.dp))
+                            Spacer(modifier = Modifier.height(7.dp))
 
-                        Text(
-                            text = if (message.isBlank()) {
-                                "Please enter a message before continuing."
-                            } else {
-                                "The message detection module is not connected to this screen yet. No prediction has been made."
-                            },
-                            color = MessageMuted,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp
-                        )
+                            Text(
+                                text = errorMessage.orEmpty(),
+                                color = MessageMuted,
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp
+                            )
+                        } else {
+                            prediction?.let { result ->
+
+                                val resultColor =
+                                    when (result.category.lowercase()) {
+                                        "safe" -> Color(0xFF198754)
+                                        "scam" -> Color(0xFFB42318)
+                                        else -> Color(0xFFB26A00)
+                                    }
+
+                                Text(
+                                    text = "Result: ${result.category}",
+                                    color = resultColor,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text(
+                                    text = "Model confidence: ${
+                                        String.format(
+                                            Locale.US,
+                                            "%.2f",
+                                            result.confidence
+                                        )
+                                    }%",
+                                    color = MessageNavy,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Text(
+                                    text = "Category scores",
+                                    color = MessageNavy,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                listOf(
+                                    "safe",
+                                    "suspicious",
+                                    "scam"
+                                ).forEach { category ->
+
+                                    result.scores[category]?.let { score ->
+                                        Text(
+                                            text = "${
+                                                category.replaceFirstChar {
+                                                    it.uppercase()
+                                                }
+                                            }: ${
+                                                String.format(
+                                                    Locale.US,
+                                                    "%.2f",
+                                                    score
+                                                )
+                                            }%",
+                                            color = MessageMuted,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text(
+                                    text = result.note.ifBlank {
+                                        "Prototype prediction, not a guarantee."
+                                    },
+                                    color = MessageMuted,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -323,7 +454,7 @@ fun MessageScreen(onBack: () -> Unit) {
     }
 }
 
-// Vector message icon - no font dependency
+// Existing message icon
 @Composable
 private fun MessageIcon(
     modifier: Modifier = Modifier,
@@ -394,5 +525,75 @@ private fun MessageIcon(
             strokeWidth = stroke,
             cap = StrokeCap.Round
         )
+    }
+}
+
+// Backend API communication
+private suspend fun checkMessageWithApi(
+    message: String
+): MessagePrediction = withContext(Dispatchers.IO) {
+
+    val connection =
+        URL(MESSAGE_API_URL).openConnection() as HttpURLConnection
+
+    try {
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 10000
+        connection.readTimeout = 20000
+        connection.doOutput = true
+
+        connection.setRequestProperty(
+            "Content-Type",
+            "application/json; charset=utf-8"
+        )
+        connection.setRequestProperty(
+            "Accept",
+            "application/json"
+        )
+
+        val requestBody = JSONObject()
+            .put("message", message)
+            .toString()
+
+        connection.outputStream.use { stream ->
+            stream.write(requestBody.toByteArray(Charsets.UTF_8))
+        }
+
+        val statusCode = connection.responseCode
+
+        if (statusCode !in 200..299) {
+            throw IllegalStateException(
+                "API returned HTTP $statusCode"
+            )
+        }
+
+        val responseBody =
+            connection.inputStream.bufferedReader(
+                Charsets.UTF_8
+            ).use { it.readText() }
+
+        val json = JSONObject(responseBody)
+
+        val scoresJson = json.optJSONObject("scores")
+        val scores = mutableMapOf<String, Double>()
+
+        if (scoresJson != null) {
+            for (category in listOf("safe", "suspicious", "scam")) {
+                if (scoresJson.has(category)) {
+                    scores[category] =
+                        scoresJson.getDouble(category)
+                }
+            }
+        }
+
+        MessagePrediction(
+            category = json.getString("category"),
+            confidence = json.getDouble("confidence"),
+            scores = scores,
+            note = json.optString("note", "")
+        )
+
+    } finally {
+        connection.disconnect()
     }
 }

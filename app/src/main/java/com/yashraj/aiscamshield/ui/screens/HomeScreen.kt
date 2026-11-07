@@ -1,11 +1,19 @@
 ﻿
-
 package com.yashraj.aiscamshield.ui.screens
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,11 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,6 +50,8 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 20.dp)
     ) {
+
+        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -74,6 +80,7 @@ fun HomeScreen(
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
+
                 Text(
                     text = "YOUR DIGITAL SAFETY PARTNER",
                     color = HomeMuted,
@@ -89,15 +96,17 @@ fun HomeScreen(
                     .background(Color(0xFFE5EEFF)),
                 contentAlignment = Alignment.Center
             ) {
-                CheckIcon(
-                    modifier = Modifier.size(23.dp),
-                    color = HomeBlue
+                Text(
+                    text = "\u2713",
+                    color = HomeBlue,
+                    fontSize = 22.sp
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(30.dp))
 
+        // Welcome heading
         Text(
             text = "Stay one step",
             color = HomeNavy,
@@ -124,6 +133,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Security banner
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(25.dp),
@@ -140,7 +150,9 @@ fun HomeScreen(
                     .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = "THINK BEFORE YOU CLICK",
                         color = Color(0xFFBFD6FF),
@@ -175,7 +187,7 @@ fun HomeScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "!",
+                        text = "\u2713",
                         color = Color.White,
                         fontSize = 43.sp,
                         fontWeight = FontWeight.Bold
@@ -196,13 +208,14 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(13.dp))
 
+        // First row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(13.dp)
         ) {
             FeatureCard(
                 modifier = Modifier.weight(1f),
-                iconType = "message",
+                symbol = "\u2709",
                 title = "Message",
                 subtitle = "Check suspicious texts",
                 number = "01",
@@ -212,7 +225,7 @@ fun HomeScreen(
 
             FeatureCard(
                 modifier = Modifier.weight(1f),
-                iconType = "link",
+                symbol = "\u2197",
                 title = "Web Links",
                 subtitle = "Check a URL",
                 number = "02",
@@ -223,13 +236,14 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(13.dp))
 
+        // Second row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(13.dp)
         ) {
             FeatureCard(
                 modifier = Modifier.weight(1f),
-                iconType = "qr",
+                symbol = "\u25A6",
                 title = "QR & UPI",
                 subtitle = "Check payment risks",
                 number = "03",
@@ -239,7 +253,7 @@ fun HomeScreen(
 
             FeatureCard(
                 modifier = Modifier.weight(1f),
-                iconType = "phone",
+                symbol = "\u260E",
                 title = "Phone Check",
                 subtitle = "Review a number",
                 number = "04",
@@ -250,6 +264,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Safety reminder
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -303,7 +318,7 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(22.dp))
 
         Text(
-            text = "SCAMSHIELD  |  DIGITAL SAFETY",
+            text = "SCAMSHIELD  \u2022  DIGITAL SAFETY",
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp),
@@ -318,7 +333,7 @@ fun HomeScreen(
 @Composable
 private fun FeatureCard(
     modifier: Modifier = Modifier,
-    iconType: String,
+    symbol: String,
     title: String,
     subtitle: String,
     number: String,
@@ -353,10 +368,11 @@ private fun FeatureCard(
                         .background(tint),
                     contentAlignment = Alignment.Center
                 ) {
-                    FeatureIcon(
-                        type = iconType,
-                        modifier = Modifier.size(25.dp),
-                        color = HomeNavy
+                    Text(
+                        text = symbol,
+                        color = HomeNavy,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
@@ -391,168 +407,11 @@ private fun FeatureCard(
             Spacer(modifier = Modifier.weight(1f))
 
             Text(
-                text = "Explore  >",
+                text = "Explore  \u2192",
                 color = HomeBlue,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold
             )
-        }
-    }
-}
-
-@Composable
-private fun CheckIcon(
-    modifier: Modifier = Modifier,
-    color: Color = HomeNavy
-) {
-    Canvas(modifier = modifier) {
-        val stroke = 3.dp.toPx()
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(size.width * 0.16f, size.height * 0.52f)
-            lineTo(size.width * 0.40f, size.height * 0.76f)
-            lineTo(size.width * 0.85f, size.height * 0.22f)
-        }
-        drawPath(
-            path = path,
-            color = color,
-            style = Stroke(
-                width = stroke,
-                cap = StrokeCap.Round
-            )
-        )
-    }
-}
-
-@Composable
-private fun FeatureIcon(
-    type: String,
-    modifier: Modifier = Modifier,
-    color: Color = HomeNavy
-) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.2.dp.toPx()
-
-        when (type) {
-            "message" -> {
-                val bubble = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(w * 0.16f, h * 0.18f)
-                    lineTo(w * 0.84f, h * 0.18f)
-                    quadraticTo(w * 0.90f, h * 0.18f, w * 0.90f, h * 0.27f)
-                    lineTo(w * 0.90f, h * 0.67f)
-                    quadraticTo(w * 0.90f, h * 0.76f, w * 0.81f, h * 0.76f)
-                    lineTo(w * 0.42f, h * 0.76f)
-                    lineTo(w * 0.20f, h * 0.92f)
-                    lineTo(w * 0.20f, h * 0.76f)
-                    quadraticTo(w * 0.10f, h * 0.76f, w * 0.10f, h * 0.67f)
-                    lineTo(w * 0.10f, h * 0.27f)
-                    quadraticTo(w * 0.10f, h * 0.18f, w * 0.16f, h * 0.18f)
-                    close()
-                }
-                drawPath(bubble, color, style = Stroke(stroke))
-
-                drawLine(
-                    color,
-                    Offset(w * 0.28f, h * 0.39f),
-                    Offset(w * 0.72f, h * 0.39f),
-                    stroke
-                )
-                drawLine(
-                    color,
-                    Offset(w * 0.28f, h * 0.55f),
-                    Offset(w * 0.60f, h * 0.55f),
-                    stroke
-                )
-            }
-
-            "link" -> {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(w * 0.07f, h * 0.36f),
-                    size = Size(w * 0.53f, h * 0.30f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                        h * 0.15f
-                    ),
-                    style = Stroke(stroke)
-                )
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(w * 0.40f, h * 0.34f),
-                    size = Size(w * 0.53f, h * 0.30f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                        h * 0.15f
-                    ),
-                    style = Stroke(stroke)
-                )
-            }
-
-            "qr" -> {
-                val s = stroke
-                fun corner(x: Float, y: Float) {
-                    drawRect(
-                        color = color,
-                        topLeft = Offset(x, y),
-                        size = Size(w * 0.27f, h * 0.27f),
-                        style = Stroke(s)
-                    )
-                    drawRect(
-                        color = color,
-                        topLeft = Offset(
-                            x + w * 0.09f,
-                            y + h * 0.09f
-                        ),
-                        size = Size(w * 0.09f, h * 0.09f)
-                    )
-                }
-                corner(w * 0.08f, h * 0.08f)
-                corner(w * 0.65f, h * 0.08f)
-                corner(w * 0.08f, h * 0.65f)
-
-                drawRect(
-                    color,
-                    Offset(w * 0.65f, h * 0.65f),
-                    Size(w * 0.12f, h * 0.12f)
-                )
-                drawRect(
-                    color,
-                    Offset(w * 0.82f, h * 0.82f),
-                    Size(w * 0.10f, h * 0.10f)
-                )
-                drawRect(
-                    color,
-                    Offset(w * 0.65f, h * 0.85f),
-                    Size(w * 0.09f, h * 0.09f)
-                )
-            }
-
-            "phone" -> {
-                val handset = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(w * 0.24f, h * 0.12f)
-                    lineTo(w * 0.40f, h * 0.29f)
-                    lineTo(w * 0.34f, h * 0.43f)
-                    quadraticTo(
-                        w * 0.46f, h * 0.64f,
-                        w * 0.62f, h * 0.69f
-                    )
-                    lineTo(w * 0.74f, h * 0.60f)
-                    lineTo(w * 0.90f, h * 0.77f)
-                    quadraticTo(
-                        w * 0.80f, h * 0.96f,
-                        w * 0.61f, h * 0.86f
-                    )
-                    quadraticTo(
-                        w * 0.29f, h * 0.70f,
-                        w * 0.13f, h * 0.38f
-                    )
-                    quadraticTo(
-                        w * 0.06f, h * 0.22f,
-                        w * 0.24f, h * 0.12f
-                    )
-                    close()
-                }
-                drawPath(handset, color, style = Stroke(stroke))
-            }
         }
     }
 }

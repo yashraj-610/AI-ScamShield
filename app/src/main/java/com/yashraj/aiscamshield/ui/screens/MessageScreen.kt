@@ -37,7 +37,7 @@ private val MessageMuted = Color(0xFF71819A)
 private val MessageSoftBlue = Color(0xFFE4EEFF)
 
 private const val MESSAGE_API_URL =
-    "http://127.0.0.1:8000/check-message"
+    "http://127.0.0.1:8765/check-message"
 
 private data class MessagePrediction(
     val category: String,

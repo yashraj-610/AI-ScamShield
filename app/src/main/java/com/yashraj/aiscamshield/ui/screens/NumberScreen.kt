@@ -1,48 +1,30 @@
-﻿
 
 package com.yashraj.aiscamshield.ui.screens
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Locale
 
 private val NumberBg = Color(0xFFF5F8FF)
 private val NumberNavy = Color(0xFF183B65)
@@ -50,11 +32,48 @@ private val NumberBlue = Color(0xFF477DE0)
 private val NumberMuted = Color(0xFF71819A)
 private val NumberSoftBlue = Color(0xFFE4EEFF)
 
+private const val CALL_TEXT_API =
+    "http://127.0.0.1:8765/check-message"
+
+private data class CallerTextResult(
+    val category: String,
+    val confidence: Double,
+    val note: String
+)
+
+private fun normalizeIndianMobile(input: String): String? {
+    if (input.any { !it.isDigit() && it !in " +().-" }) {
+        return null
+    }
+
+    val digits = input.filter { it in '0'..'9' }
+
+    val mobile = when {
+        digits.length == 10 -> digits
+        digits.length == 11 &&
+                digits.startsWith("0") -> digits.drop(1)
+        digits.length == 12 &&
+                digits.startsWith("91") -> digits.drop(2)
+        else -> return null
+    }
+
+    return mobile.takeIf {
+        it.matches(Regex("[6-9][0-9]{9}"))
+    }
+}
+
 @Composable
 fun NumberScreen(onBack: () -> Unit) {
 
     var phoneNumber by remember { mutableStateOf("") }
+    var callerWords by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
+    var prediction by remember {
+        mutableStateOf<CallerTextResult?>(null)
+    }
+    var checking by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -64,11 +83,15 @@ fun NumberScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 22.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(
+                    horizontal = 22.dp,
+                    vertical = 20.dp
+                ),
+            verticalArrangement =
+                Arrangement.spacedBy(20.dp)
         ) {
 
-            // Top navigation
+            // Navigation
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -77,10 +100,7 @@ fun NumberScreen(onBack: () -> Unit) {
                     onClick = onBack,
                     shape = RoundedCornerShape(13.dp)
                 ) {
-                    Text(
-                        text = "Back",
-                        color = NumberNavy
-                    )
+                    Text("Back", color = NumberNavy)
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -107,13 +127,14 @@ fun NumberScreen(onBack: () -> Unit) {
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    PhoneCheckIcon(
-                        modifier = Modifier.size(32.dp),
-                        color = NumberNavy
+                    Text(
+                        text = "\u260E",
+                        color = NumberNavy,
+                        fontSize = 30.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column {
                     Text(
@@ -162,7 +183,7 @@ fun NumberScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.height(7.dp))
 
                     Text(
-                        text = "Be alert if a caller pressures you to share an OTP, reveal bank details, or make an urgent payment.",
+                        text = "Check the number format and analyse what the caller said. A number alone cannot prove a scam.",
                         color = Color(0xFFD7E4F8),
                         fontSize = 13.sp,
                         lineHeight = 20.sp
@@ -170,9 +191,10 @@ fun NumberScreen(onBack: () -> Unit) {
                 }
             }
 
-            // Phone number input
+            // Number input
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
             ) {
                 Text(
                     text = "PHONE NUMBER",
@@ -184,9 +206,10 @@ fun NumberScreen(onBack: () -> Unit) {
 
                 OutlinedTextField(
                     value = phoneNumber,
-                    onValueChange = { input ->
-                        phoneNumber = input
+                    onValueChange = {
+                        phoneNumber = it
                         message = ""
+                        prediction = null
                     },
                     modifier = Modifier.fillMaxWidth(),
                     label = {
@@ -195,14 +218,15 @@ fun NumberScreen(onBack: () -> Unit) {
                     placeholder = {
                         Text("e.g. +91 98765 43210")
                     },
-                    singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Phone
                     ),
+                    singleLine = true,
                     shape = RoundedCornerShape(17.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NumberBlue,
-                        unfocusedBorderColor = Color(0xFFD7E1F0),
+                        unfocusedBorderColor =
+                            Color(0xFFD7E1F0),
                         focusedLabelColor = NumberBlue,
                         cursorColor = NumberBlue,
                         focusedContainerColor = Color.White,
@@ -211,7 +235,55 @@ fun NumberScreen(onBack: () -> Unit) {
                 )
 
                 Text(
-                    text = "Enter the number you want to review.",
+                    text = "Format check supports Indian mobile numbers.",
+                    color = NumberMuted,
+                    fontSize = 12.sp
+                )
+            }
+
+            // Caller details
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "WHAT DID THE CALLER SAY? (OPTIONAL)",
+                    color = NumberNavy,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+
+                OutlinedTextField(
+                    value = callerWords,
+                    onValueChange = {
+                        callerWords = it
+                        message = ""
+                        prediction = null
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("Caller message / call summary")
+                    },
+                    placeholder = {
+                        Text(
+                            "Example: Share your OTP immediately to unblock your account"
+                        )
+                    },
+                    minLines = 3,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(17.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NumberBlue,
+                        unfocusedBorderColor =
+                            Color(0xFFD7E1F0),
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    )
+                )
+
+                Text(
+                    text = "Caller text is analysed using the existing Message Detection server.",
                     color = NumberMuted,
                     fontSize = 12.sp
                 )
@@ -220,12 +292,48 @@ fun NumberScreen(onBack: () -> Unit) {
             // Check button
             Button(
                 onClick = {
-                    message = if (phoneNumber.isBlank()) {
-                        "Please enter a phone number."
-                    } else {
-                        "Number received. Real scam detection is not connected to this screen yet."
+                    val normalized =
+                        normalizeIndianMobile(phoneNumber)
+
+                    prediction = null
+
+                    when {
+                        normalized == null -> {
+                            message =
+                                "Enter a valid Indian mobile number (10 digits, starting with 6-9)."
+                        }
+
+                        callerWords.isBlank() -> {
+                            message =
+                                "Format valid: +91 $normalized. Number reputation: NOT VERIFIED. No verified spam-number database is connected."
+                        }
+
+                        else -> {
+                            scope.launch {
+                                checking = true
+                                message = ""
+
+                                try {
+                                    prediction = checkCallerText(
+                                        callerWords.trim()
+                                    )
+
+                                    message =
+                                        "Format valid: +91 $normalized. Number reputation: NOT VERIFIED. The result below is about what the caller said, not the phone number."
+
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    message =
+                                        "Format valid: +91 $normalized. Number reputation: NOT VERIFIED. Caller analysis failed: ${e.message ?: "Server unavailable"}"
+                                } finally {
+                                    checking = false
+                                }
+                            }
+                        }
                     }
                 },
+                enabled = !checking,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -235,15 +343,29 @@ fun NumberScreen(onBack: () -> Unit) {
                     contentColor = Color.White
                 )
             ) {
+                if (checking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
+
                 Text(
-                    text = "Check Number",
+                    text = if (checking) {
+                        "Checking..."
+                    } else {
+                        "Check Number"
+                    },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // Check status
-            if (message.isNotEmpty()) {
+            // Results
+            if (message.isNotBlank() || prediction != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
@@ -252,7 +374,9 @@ fun NumberScreen(onBack: () -> Unit) {
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(18.dp)
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement =
+                            Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = "Check Status",
@@ -261,14 +385,56 @@ fun NumberScreen(onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold
                         )
 
-                        Spacer(modifier = Modifier.height(7.dp))
+                        if (message.isNotBlank()) {
+                            Text(
+                                text = message,
+                                color = NumberMuted,
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp
+                            )
+                        }
 
-                        Text(
-                            text = message,
-                            color = NumberMuted,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp
-                        )
+                        prediction?.let { found ->
+                            val resultColor =
+                                when (found.category.lowercase()) {
+                                    "scam" -> Color(0xFFB42318)
+                                    "suspicious" -> Color(0xFFB26A00)
+                                    else -> Color(0xFF198754)
+                                }
+
+                            Text(
+                                text = "Caller text: ${found.category.uppercase()}",
+                                color = resultColor,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "Model confidence: ${
+                                    String.format(
+                                        Locale.US,
+                                        "%.2f",
+                                        found.confidence
+                                    )
+                                }%",
+                                color = NumberMuted,
+                                fontSize = 13.sp
+                            )
+
+                            if (found.note.isNotBlank()) {
+                                Text(
+                                    text = found.note,
+                                    color = NumberMuted,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            Text(
+                                text = "A Safe text prediction does not mean the caller or number is safe.",
+                                color = NumberMuted,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
@@ -302,7 +468,7 @@ fun NumberScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    Spacer(modifier = Modifier.size(11.dp))
+                    Spacer(modifier = Modifier.width(11.dp))
 
                     Column {
                         Text(
@@ -327,56 +493,75 @@ fun NumberScreen(onBack: () -> Unit) {
     }
 }
 
-// Vector phone icon - no emoji or font dependency
-@Composable
-private fun PhoneCheckIcon(
-    modifier: Modifier = Modifier,
-    color: Color = NumberNavy
-) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.5.dp.toPx()
+// Uses the existing Message Detection backend.
+private suspend fun checkCallerText(
+    text: String
+): CallerTextResult = withContext(Dispatchers.IO) {
 
-        val handset = Path().apply {
-            moveTo(w * 0.24f, h * 0.12f)
-            lineTo(w * 0.40f, h * 0.29f)
-            lineTo(w * 0.34f, h * 0.43f)
+    val connection =
+        URL(CALL_TEXT_API).openConnection()
+                as HttpURLConnection
 
-            quadraticTo(
-                w * 0.46f, h * 0.64f,
-                w * 0.62f, h * 0.69f
-            )
+    try {
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 10000
+        connection.readTimeout = 20000
+        connection.doOutput = true
 
-            lineTo(w * 0.74f, h * 0.60f)
-            lineTo(w * 0.90f, h * 0.77f)
+        connection.setRequestProperty(
+            "Content-Type",
+            "application/json; charset=utf-8"
+        )
 
-            quadraticTo(
-                w * 0.80f, h * 0.96f,
-                w * 0.61f, h * 0.86f
-            )
+        connection.setRequestProperty(
+            "Accept",
+            "application/json"
+        )
 
-            quadraticTo(
-                w * 0.29f, h * 0.70f,
-                w * 0.13f, h * 0.38f
-            )
+        val body = JSONObject()
+            .put("message", text)
+            .toString()
 
-            quadraticTo(
-                w * 0.06f, h * 0.22f,
-                w * 0.24f, h * 0.12f
-            )
-
-            close()
+        connection.outputStream.use {
+            it.write(body.toByteArray(Charsets.UTF_8))
         }
 
-        drawPath(
-            path = handset,
-            color = color,
-            style = Stroke(
-                width = stroke,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
+        val code = connection.responseCode
+
+        val response = (
+                if (code in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+                )?.bufferedReader(Charsets.UTF_8)?.use {
+                it.readText()
+            }.orEmpty()
+
+        if (code !in 200..299) {
+            throw IOException(
+                "Backend HTTP $code: $response"
+            )
+        }
+
+        val json = JSONObject(response)
+
+        CallerTextResult(
+            category = json.optString(
+                "category",
+                "Unknown"
+            ),
+            confidence = json.optDouble(
+                "confidence",
+                0.0
+            ),
+            note = json.optString(
+                "note",
+                ""
             )
         )
+
+    } finally {
+        connection.disconnect()
     }
 }
